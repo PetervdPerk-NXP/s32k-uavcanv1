@@ -1,0 +1,9 @@
+[submodule "libcanard"]
+	path = libcanard
+	url = https://github.com/UAVCAN/libcanard
+[submodule "o1heap"]
+	path = o1heap
+	url = https://github.com/pavel-kirienko/o1heap
+[submodule "public_regulated_data_types"]
+	path = public_regulated_data_types
+	url = https://github.com/PX4/public_regulated_data_types

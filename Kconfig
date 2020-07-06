@@ -1,0 +1,42 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config S32KUAVCANV1EXAMPLE
+	tristate "S32K libcanard v1 example"
+	default n
+        select CLOCK_MONOTONIC
+	---help---
+		Enable the S32K canard v1 example
+
+if S32KUAVCANV1EXAMPLE
+
+config S32KUAVCANV1EXAMPLE_DEV
+	string "Device"
+	default "can0"
+	---help---
+		device
+
+config S32KUAVCANV1EXAMPLE_NODE_ID
+	int "Node ID"
+	default 1
+	range 1 127
+	---help---
+		Specifies the node's ID
+
+config S32KUAVCANV1EXAMPLE_NODE_MEM_POOL_SIZE
+	int "Node Memory Pool Size"
+	default 1024
+	---help---
+		Specifies the node's memory pool size
+
+config S32KUAVCANV1EXAMPLE_DAEMON_PRIORITY
+	int "daemon task priority"
+	default 100
+
+config S32KUAVCANV1EXAMPLE_DAEMON_STACK_SIZE
+	int "canard stack size"
+	default 2048
+
+endif

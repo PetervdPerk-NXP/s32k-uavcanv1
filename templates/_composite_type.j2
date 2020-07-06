@@ -1,0 +1,137 @@
+
+{% for field in composite_type.fields -%}
+    {%- if field is not padding %}
+    {%- set field_struct = field.data_type | string %}
+    {%- set field_struct_list = field_struct.split('.') %}
+        {%- if field_struct_list|length > 3 %}
+#include <{{ field_struct_list[0] }}/{{ field_struct_list[1] }}/{{ field_struct_list[2] }}/{{ field_struct_list[3] }}_{{ field_struct_list[4] }}_{{ field_struct_list[5] }}.h>
+        {%- endif -%}
+    {%- endif -%}
+{%- endfor %}
+
+
+{%- if T.fixed_port_id is not None %}
+
+	static constexpr CanardPortID PORT_ID = {{T.fixed_port_id}};
+{%- endif %}
+
+{%- set total_size = namespace(value=0) -%}
+{%- for field in composite_type.fields -%}
+    {% set total_size.value = total_size.value + field.data_type.bit_length_set|max %}
+{%- endfor %}
+
+#define {{T.full_name | c.to_snake_case | upper}}_MSG_SIZE {{total_size.value // 8}}
+{% for constant in composite_type.constants %}
+#define {{ constant.name }} 0x{{ constant.value.native_value.numerator }}
+{%- endfor -%}
+ 
+{% raw %}
+{% endraw %}
+
+typedef struct {{T.full_name | c.to_snake_case}}Type
+{
+{%- if composite_type is UnionType %}
+#error "TODO: UnionType
+{%- else %}
+{%- for field in composite_type.fields -%}
+    {%- if field is not padding %}
+        {%- if field.data_type is FloatType %}
+            {%- if field.data_type.bit_length_set|max <= 32 %}
+	float {{ field.name }};
+            {%- else %}
+	double {{ field.name }};
+            {%- endif %}
+        {%- elif field.data_type is BooleanType %}
+	bool {{ field.name }};
+        {%- elif field.data_type is IntegerType %}
+            {%- if field.data_type.bit_length_set|max <= 8 %}
+	uint8_t {{ field.name }};
+            {%- elif field.data_type.bit_length_set|max <= 16 %}
+	uint16_t {{ field.name }};
+            {%- elif field.data_type.bit_length_set|max <= 32 %}
+	uint32_t {{ field.name }};
+            {%- endif %}
+        {%- else %}
+    {%- set field_struct = field.data_type | string %}
+	{{ field_struct[:-4] | c.to_snake_case }} {{ field.name }};
+        {%- endif -%}
+    {%- endif -%}
+{%- endfor %}
+{%- endif %}
+} {{ T.full_name | c.to_snake_case }};
+
+void {{ T.full_name | c.to_snake_case }}_serializeToBuffer({{ T.full_name | c.to_snake_case }}* msg, uint8_t* const buffer, const size_t starting_bit)
+{
+{%- set bit_offset = namespace(value=0) -%}
+{%- for field in composite_type.fields -%}
+    {%- if field is not padding %}
+      {%- if field.data_type is SerializableType %}
+        {%- if field.data_type is IntegerType %}
+	canardDSDLSetUxx(buffer, starting_bit + {{ bit_offset.value }}, msg->{{ field.name }}, {{ field.data_type.bit_length_set | max }});
+        {%- elif field.data_type is BooleanType %}
+	canardDSDLSetBit(buffer, starting_bit + {{ bit_offset.value }}, msg->{{ field.name }});
+        {%- elif field.data_type is FloatType %}
+            {%- if field.data_type.bit_length_set == 16 %}
+	canardDSDLSetF16(buffer, starting_bit + {{ bit_offset.value }}, msg->{{ field.name }});
+            {%- elif field.data_type.bit_length_set == 32 %}
+	canardDSDLSetF32(buffer, starting_bit + {{ bit_offset.value }}, msg->{{ field.name }});
+            {%- elif field.data_type.bit_length_set == 64 %}
+    canardDSDLSetF64(buffer, starting_bit + {{ bit_offset.value }}, msg->{{ field.name }});
+            {%- endif %}
+        {%- else %}
+    {% set field_struct = field.data_type | string %}
+    {{ field_struct[:-4] | c.to_snake_case }}_serializeToBuffer(&msg->{{ field.name }}, buffer, starting_bit + {{ bit_offset.value }});
+        {%- endif %}
+      {%- endif -%}
+    {%- endif -%}
+    {% set bit_offset.value = bit_offset.value + field.data_type.bit_length_set|max %}
+{%- endfor %}
+}
+
+void {{ T.full_name | c.to_snake_case }}_deserializeFromBuffer({{ T.full_name | c.to_snake_case }}* msg, const uint8_t* const buffer, const size_t buf_size, const size_t starting_bit)
+{
+{% set bit_offset = namespace(value=0) %}
+{%- for field in composite_type.fields -%}
+    {%- if field is not padding %}
+      {%- if field.data_type is SerializableType %}
+        {%- if field.data_type is UnsignedIntegerType %}
+            {%- if field.data_type.bit_length_set|max<= 8 %}
+	msg->{{ field.name }} = canardDSDLGetU8(buffer, buf_size, starting_bit + {{ bit_offset.value }}, {{ field.data_type.bit_length_set | max }});
+            {%- elif field.data_type.bit_length_set|max <= 16 %}
+	msg->{{ field.name }} = canardDSDLGetU16(buffer, buf_size, starting_bit + {{ bit_offset.value }}, {{ field.data_type.bit_length_set | max }});
+            {%- elif field.data_type.bit_length_set|max <= 32 %}
+	msg->{{ field.name }} = canardDSDLGetU32(buffer, buf_size, starting_bit + {{ bit_offset.value }}, {{ field.data_type.bit_length_set | max }});
+            {%- elif field.data_type.bit_length_set|max <= 64 %}
+	msg->{{ field.name }} = canardDSDLGetU64(buffer, buf_size, starting_bit + {{ bit_offset.value }}, {{ field.data_type.bit_length_set | max }});
+            {%- endif %}
+        {%- elif field.data_type is SignedIntegerType %}
+            {%- if field.data_type.bit_length_set|max<= 8 %}
+	msg->{{ field.name }} = canardDSDLGetI8(buffer, buf_size, starting_bit + {{ bit_offset.value }}, {{ field.data_type.bit_length_set | max }});
+            {%- elif field.data_type.bit_length_set|max <= 16 %}
+	msg->{{ field.name }} = canardDSDLGetI16(buffer, buf_size, starting_bit + {{ bit_offset.value }}, {{ field.data_type.bit_length_set | max }});
+            {%- elif field.data_type.bit_length_set|max <= 32 %}
+	msg->{{ field.name }} = canardDSDLGetI32(buffer, buf_size, starting_bit + {{ bit_offset.value }}, {{ field.data_type.bit_length_set | max }});
+            {%- elif field.data_type.bit_length_set|max <= 64 %}
+	msg->{{ field.name }} = canardDSDLGetI64(buffer, buf_size, starting_bit + {{ bit_offset.value }}, {{ field.data_type.bit_length_set | max }});
+            {%- endif %}
+        {%- elif field.data_type is BooleanType %}
+	msg->{{ field.name }} = canardDSDLGetBit(buffer, buf_size, starting_bit + {{ bit_offset.value }});
+        {%- elif field.data_type is FloatType %}
+            {%- if field.data_type.bit_length_set == 16 %}
+	msg->{{ field.name }} = canardDSDLGetF16(buffer, buf_size, starting_bit + {{ bit_offset.value }});
+            {%- elif field.data_type.bit_length_set == 32 %}
+	msg->{{ field.name }} = canardDSDLGetF32(buffer, buf_size, starting_bit + {{ bit_offset.value }});
+            {%- elif field.data_type.bit_length_set == 64 %}
+	msg->{{ field.name }} = canardDSDLGetF64(buffer, buf_size, starting_bit + {{ bit_offset.value }});
+            {%- endif %}
+        {%- else %}
+    {% set field_struct = field.data_type | string %}
+	{{ field_struct[:-4] | c.to_snake_case }}_deserializeFromBuffer(&msg->{{ field.name }}, buffer, buf_size, starting_bit + {{ bit_offset.value }});
+        {%- endif %}
+      {%- endif -%}
+    {%- endif -%}
+    {% set bit_offset.value = bit_offset.value + field.data_type.bit_length_set|max %}
+{%- endfor %}
+
+    return msg;
+}
