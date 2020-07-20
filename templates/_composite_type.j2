@@ -3,8 +3,11 @@
     {%- if field is not padding %}
     {%- set field_struct = field.data_type | string %}
     {%- set field_struct_list = field_struct.split('.') %}
-        {%- if field_struct_list|length > 3 %}
+        {%- if field_struct_list|length == 6  %}
 #include <{{ field_struct_list[0] }}/{{ field_struct_list[1] }}/{{ field_struct_list[2] }}/{{ field_struct_list[3] }}_{{ field_struct_list[4] }}_{{ field_struct_list[5] }}.h>
+        {%- endif -%}
+        {%- if field_struct_list|length == 5  %}
+#include <{{ field_struct_list[0] }}/{{ field_struct_list[1] }}/{{ field_struct_list[2] }}_{{ field_struct_list[3] }}_{{ field_struct_list[4][:1] }}.h>
         {%- endif -%}
     {%- endif -%}
 {%- endfor %}
